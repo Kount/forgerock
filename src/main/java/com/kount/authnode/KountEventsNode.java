@@ -4,8 +4,14 @@ import static org.forgerock.openam.auth.node.api.SharedStateConstants.PASSWORD;
 import static org.forgerock.openam.auth.node.api.SharedStateConstants.REALM;
 import static org.forgerock.openam.auth.node.api.SharedStateConstants.USERNAME;
 
-import java.util.Iterator;
-import java.util.Set;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 import javax.inject.Inject;
 
@@ -21,17 +27,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.inject.assistedinject.Assisted;
-import com.iplanet.sso.SSOException;
 import com.sun.identity.idm.AMIdentity;
-import com.sun.identity.idm.IdRepoException;
 import com.sun.identity.idm.IdUtils;
 import com.sun.identity.security.EncryptAction;
-
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
 
 /**
  * @author reshma.madan
@@ -63,33 +61,42 @@ public class KountEventsNode extends SingleOutcomeNode {
 	
 	
 	@Inject
-	public KountEventsNode(@Assisted Config config, HttpClientHandler client) {
+	public KountEventsNode(@Assisted Config config) {
 		this.config = config;
 	}	
 	@Override
 	public Action process(TreeContext context) throws NodeProcessException {
 		logger.debug("Kount Login Events started");
-		context.sharedState.put("API_KEY", config.API_KEY());
-		System.out.println("1");
-		callEventsAPI(context);
-		System.out.println("2");
-		System.out.println("Kount Login Events Node completed");
+		String userHandle = context.sharedState.get(USERNAME).asString();
+		if(userHandle!=null) {
+			AMIdentity id = IdUtils.getIdentity(userHandle, context.sharedState.get(REALM).asString());
+			context.sharedState.put("API_KEY", config.API_KEY());
+			callEventsAPI(context,id);
+		}else {
+			throw new NodeProcessException("User Name is empty");
+		}
 		return goToNext().replaceSharedState(context.sharedState).build();
 	}
 	
 	/**
 	 * @param context
+	 * @param id 
 	 * @throws NodeProcessException
 	 */
-	private void callEventsAPI(TreeContext context) throws NodeProcessException {
-		System.out.println("-----Inside Kount Login EVENTS callEventsAPI--------------");
+	private void callEventsAPI(TreeContext context, AMIdentity id) throws NodeProcessException {
 		try {
-			OkHttpClient client = new OkHttpClient().newBuilder().build();
-			Request request=getRequest(context);
-					Response response = client.newCall(request).execute();
-					if(response.code()==200) {
-						System.out.println("response code= "+response.code());
-						context.sharedState.put("kountEventsResponseBody", response.body().string());
+			HttpURLConnection connection=gePostConnection(context,id);
+			InputStreamReader in = new InputStreamReader((InputStream) connection.getContent());
+			BufferedReader buff = new BufferedReader(in);
+			String line;
+			StringBuilder builder = new StringBuilder();
+			do {
+				line = buff.readLine();
+				builder.append(line).append("\n");
+			} while (line != null);
+			buff.close();
+					if(connection.getResponseCode()==200) {
+						context.sharedState.put("kountEventsResponseBody", builder.toString());
 					}
 		} catch (Exception e) {
 			logger.error("Unable to get TMX response for session: ");
@@ -100,34 +107,35 @@ public class KountEventsNode extends SingleOutcomeNode {
 	 * @param context
 	 * @return
 	 */
-	private Request getRequest(TreeContext context) {
+	private HttpURLConnection gePostConnection(TreeContext context, AMIdentity identity) {
 		String ip="";
-		String mail = null;
-		Iterator itor = null;
-		String userHandle = context.sharedState.get(USERNAME).asString();
-		AMIdentity identity = IdUtils.getIdentity(userHandle, context.sharedState.get(REALM).asString());
+		HttpURLConnection connection = null;
 		try {
-			Set emails = identity.getAttribute("mail");
-			if (emails != null && !emails.isEmpty()) {
-				itor = emails.iterator();
-				mail = (String) itor.next();
-			}
-		} catch (SSOException | IdRepoException e1) {
+
+				JsonValue transientState = context.transientState;
+				EncryptAction encryptedPwd=new EncryptAction(transientState.get(PASSWORD).asString());
+				String uri="https://"+config.domain();
+				URL url = new URL(uri);
+				connection = (HttpURLConnection) url.openConnection();
+				// Now it's "open", we can set the request method, headers etc.
+				connection.setRequestProperty("accept", "application/json");
+				connection.setRequestProperty ("Authorization", "Bearer "+config.API_KEY());
+				connection.setRequestMethod("POST");
+				connection.setDoOutput(true);
+				OutputStream os = connection.getOutputStream();
+				OutputStreamWriter osw = new OutputStreamWriter(os, "UTF-8");    
+				osw.write("{\r\n  \"failedAttempt\": {\r\n \"clientId\": \""+context.sharedState.get("kountMerchant").asString()+"\",\r\n\"sessionId\": \""+context.sharedState.get("kountSession").asString()+"\",\r\n\"username\": \""+context.sharedState.get(USERNAME).asString()+"\",\r\n\"userPassword\": \""+encryptedPwd.run().toString()+"\",\r\n\"userIp\": \""+ip+"\"\r\n}\r\n}");
+				osw.flush();
+				osw.close();
+				os.close();  //don't forget to close the OutputStream
+				connection.connect();
+
+		} catch (IOException e) {
 			// TODO Auto-generated catch block
-			e1.printStackTrace();
+			e.printStackTrace();
 		}
-		
-		JsonValue transientState = context.transientState;
-		EncryptAction encryptedPwd=new EncryptAction(transientState.get(PASSWORD).asString());
-		MediaType mediaType = MediaType.parse("application/json");
-		RequestBody body = RequestBody.create(mediaType,"{\r\n  \"failedAttempt\": {\r\n \"clientId\": \""+context.sharedState.get("kountMerchant").asString()+"\",\r\n\"sessionId\": \""+context.sharedState.get("kountSession").asString()+"\",\r\n\"userId\": \""+mail+"\",\r\n\"username\": \""+context.sharedState.get(USERNAME).asString()+"\",\r\n\"userPassword\": \""+encryptedPwd.run().toString()+"\",\r\n\"userIp\": \""+ip+"\"\r\n}\r\n}");
-		Request request = new Request.Builder()
-				.url("https://"+config.domain())
-				.method("POST", body)
-				.addHeader("Authorization","Bearer "+config.API_KEY())
-				.addHeader("Content-Type", "application/json")
-				.build();
-		return request;
+		return connection;
+
 	}
 
 }

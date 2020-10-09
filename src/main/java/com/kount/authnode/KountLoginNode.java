@@ -5,17 +5,18 @@ import static org.forgerock.openam.auth.node.api.SharedStateConstants.USERNAME;
 import static org.forgerock.openam.auth.node.api.SharedStateConstants.PASSWORD;
 import static com.kount.authnode.KountLoginNode.UserType.ALLOW;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.Iterator;
 import java.util.Set;
 
 import javax.inject.Inject;
-import javax.inject.Named;
-
-import org.forgerock.http.Handler;
-import org.forgerock.http.handler.HttpClientHandler;
-import org.forgerock.http.header.AuthorizationHeader;
-import org.forgerock.http.header.MalformedHeaderException;
 import org.forgerock.json.JsonValue;
 import org.forgerock.openam.annotations.sm.Attribute;
 import org.forgerock.openam.auth.node.api.Action;
@@ -32,13 +33,6 @@ import com.sun.identity.idm.AMIdentity;
 import com.sun.identity.idm.IdRepoException;
 import com.sun.identity.idm.IdUtils;
 import com.sun.identity.security.EncryptAction;
-
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-import okio.Buffer;
 
 /**
  * A node that locks a user account (sets the user as "inactive").
@@ -69,9 +63,9 @@ public class KountLoginNode extends SingleOutcomeNode {
 			return "Server URL";
 		}
 
-		@Attribute(order = 300, requiredValue = true)
-		default String login() {
-			return "Login";
+		@Attribute(order = 300,requiredValue = true)
+		default String unique_Identifier() {
+			return "Unique Identifier";
 		}
 
 		@Attribute(order = 400,requiredValue = true)
@@ -97,8 +91,13 @@ public class KountLoginNode extends SingleOutcomeNode {
 	 *                                objects.
 	 * @param config                  The config for this instance.
 	 */
+	/*
+	 * @Inject public KountLoginNode(@Assisted Config config, HttpClientHandler
+	 * client, @Named("HttpClientHandler") Handler handler) { this.config = config;
+	 * }
+	 */
 	@Inject
-	public KountLoginNode(@Assisted Config config, HttpClientHandler client, @Named("HttpClientHandler") Handler handler) {
+	public KountLoginNode(@Assisted Config config) {
 		this.config = config;
 	}
 
@@ -109,59 +108,85 @@ public class KountLoginNode extends SingleOutcomeNode {
 		if(userHandle!=null) {
 			AMIdentity id = IdUtils.getIdentity(userHandle, context.sharedState.get(REALM).asString());
 			getKountLoginRequest(context, id);
+		}else {
+			throw new NodeProcessException("User Name is empty");
 		}
 		context.sharedState.put("API_KEY", config.API_KEY());
 		return goToNext().replaceSharedState(context.sharedState).build();
 	}
 
-	private void getKountLoginRequest(TreeContext context, AMIdentity identity) throws NodeProcessException {
+	void getKountLoginRequest(TreeContext context, AMIdentity identity) throws NodeProcessException {
 		JsonValue sharedState = context.sharedState;
 		if(config.userType()!=null && !config.userType().toString().isEmpty()) {
 			sharedState.add("userType", config.userType().toString());
+		}else {
+			throw new NodeProcessException("User Type is empty");
 		}
 		try {
 
-			OkHttpClient client = new OkHttpClient().newBuilder().build();
-			Request request=getRequest(context);
-			Response response = client.newCall(request).execute();
-			if(response.code()==200) {
-				context.sharedState.put("KountLoginApiResponse", response);
-				context.sharedState.put("kountLoginResponseBody", response.body().string());
+			HttpURLConnection connection=gePostConnection(context,identity);
+			// This line makes the request
+			InputStreamReader in = new InputStreamReader((InputStream) connection.getContent());
+			BufferedReader buff = new BufferedReader(in);
+			String line;
+			StringBuilder builder = new StringBuilder();
+			do {
+				line = buff.readLine();
+				builder.append(line).append("\n");
+			} while (line != null);
+			buff.close();
+
+			if(connection.getResponseCode()==200) {
+				context.sharedState.put("KountLoginApiResponse", builder);
+				context.sharedState.put("kountLoginResponseBody", builder.toString());
+			}else {
+				throw new NodeProcessException("Http response code is not as Expected");
 			}
 		} catch (Exception e) {
 			logger.error("Unable to get TMX response for session: ");
 			throw new NodeProcessException(e);
 		}
 	}
-	private Request getRequest(TreeContext context) {
-		String ip="";
-		String mail = null;
-		Iterator itor = null;
-		String userHandle = context.sharedState.get(USERNAME).asString();
-		AMIdentity identity = IdUtils.getIdentity(userHandle, context.sharedState.get(REALM).asString());
-		try {
-			Set emails = identity.getAttribute("mail");
-			if (emails != null && !emails.isEmpty()) {
-				itor = emails.iterator();
-				mail = (String) itor.next();
-			}
-		} catch (SSOException | IdRepoException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
 
-		JsonValue transientState = context.transientState;
-		EncryptAction encryptedPwd=new EncryptAction(transientState.get(PASSWORD).asString());
-		MediaType mediaType = MediaType.parse("application/json");
-		RequestBody body = RequestBody.create(mediaType,"{\r\n\"clientId\": \""+context.sharedState.get("kountMerchant").asString()+"\",\r\n\"sessionId\": \""+context.sharedState.get("kountSession").asString()+"\",\r\n\"userId\": \""+mail+"\",\r\n\"userPassword\": \""+encryptedPwd.run().toString()+"\",\r\n\"userType\": \""+config.userType().toString()+"\",\r\n\"username\": \""+context.sharedState.get(USERNAME).asString()+"\"\r\n}");
-		Request request = new Request.Builder()
-				.url("https://"+config.domain()+"/" +config.login())
-				.method("POST", body)
-				.addHeader("Authorization", "Bearer "+config.API_KEY())
-				.addHeader("Content-Type", "application/json")
-				.build();
-		return request;
+	private HttpURLConnection gePostConnection(TreeContext context, AMIdentity identity) throws NodeProcessException {
+		String ip="";
+		String userId = null;
+		Iterator itor = null;
+		HttpURLConnection connection = null;
+		try {
+			Set userIds = identity.getAttribute(config.unique_Identifier());
+			if (userIds != null && !userIds.isEmpty()) {
+				itor = userIds.iterator();
+				userId = (String) itor.next();
+			}else {
+				throw new NodeProcessException("UserId id empty");
+			}
+				JsonValue transientState = context.transientState;
+				EncryptAction encryptedPwd=new EncryptAction(transientState.get(PASSWORD).asString());
+				String uri="https://"+config.domain();
+				URL url = new URL(uri);
+				connection = (HttpURLConnection) url.openConnection();
+				// Now it's "open", we can set the request method, headers etc.
+				connection.setRequestProperty("accept", "application/json");
+				connection.setRequestProperty ("Authorization", "Bearer "+config.API_KEY());
+				connection.setRequestMethod("POST");
+				connection.setDoOutput(true);
+				OutputStream os = connection.getOutputStream();
+				OutputStreamWriter osw = new OutputStreamWriter(os, "UTF-8");    
+				osw.write("{\r\n\"clientId\": \""+context.sharedState.get("kountMerchant").asString()+"\",\r\n\"sessionId\": \""+context.sharedState.get("kountSession").asString()+"\",\r\n\"userId\": \""+userId+"\",\r\n\"userPassword\": \""+encryptedPwd.run().toString()+"\",\r\n\"userType\": \""+config.userType().toString()+"\",\r\n\"username\": \""+context.sharedState.get(USERNAME).asString()+"\"\r\n}");
+				osw.flush();
+				osw.close();
+				os.close();  //don't forget to close the OutputStream
+				connection.connect();
+
+		} catch (SSOException | IdRepoException  |IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return connection;
+
 	}
+
 
 
 }

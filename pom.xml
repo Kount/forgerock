@@ -72,10 +72,69 @@
             <artifactId>openam-core</artifactId>
             <scope>provided</scope>
         </dependency>
-         <dependency>
-   			 <groupId>com.squareup.okhttp3</groupId>
-   				 <artifactId>okhttp</artifactId>
-  				  <version>4.1.0</version>
+		<dependency>
+			<groupId>auth-nodes-7.0.0</groupId>
+			<artifactId>auth-nodes-7.0.0</artifactId>
+			<scope>system</scope>
+			<version>1.0</version>
+			<systemPath>D:\apache-tomcat-8.5.57\webapps\openam\WEB-INF\lib\auth-nodes-7.0.0.jar</systemPath>
+		</dependency>
+		<dependency>
+			<groupId>openam-devices-7.0.0</groupId>
+			<artifactId>openam-devices-7.0.0</artifactId>
+			<scope>system</scope>
+			<version>1.0</version>
+			<systemPath>D:\apache-tomcat-8.5.57\webapps\openam\WEB-INF\lib\openam-devices-7.0.0.jar</systemPath>
+		</dependency>
+		<dependency>
+			<groupId>org.forgerock.am</groupId>
+			<artifactId>openam-monitoring-test-assertions</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.forgerock.am</groupId>
+			<artifactId>openam-shared</artifactId>
+			<type>test-jar</type>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.forgerock.am</groupId>
+			<artifactId>openam-monitoring-test-assertions</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.forgerock.commons</groupId>
+			<artifactId>forgerock-test-utils</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.forgerock.am</groupId>
+			<artifactId>openam-shared</artifactId>
+			<type>test-jar</type>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.forgerock.am</groupId>
+			<artifactId>openam-guice-test</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.assertj</groupId>
+			<artifactId>assertj-core</artifactId>
+			<version>3.15.0</version>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-core</artifactId>
+			<version>3.3.3</version>
+			<scope>test</scope>
 		</dependency>
     </dependencies>
 

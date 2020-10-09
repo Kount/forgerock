@@ -2,14 +2,18 @@ package com.kount.authnode;
 
 import static org.forgerock.openam.auth.node.api.SharedStateConstants.USERNAME;
 
+import java.io.BufferedReader;
 import java.io.IOException;
-import java.util.ResourceBundle;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 import javax.inject.Inject;
 
 import org.forgerock.http.handler.HttpClientHandler;
-import org.forgerock.http.header.AuthorizationHeader;
-import org.forgerock.http.header.MalformedHeaderException;
 import org.forgerock.json.JsonValue;
 import org.forgerock.openam.annotations.sm.Attribute;
 import org.forgerock.openam.auth.node.api.Action;
@@ -17,6 +21,7 @@ import org.forgerock.openam.auth.node.api.Node;
 import org.forgerock.openam.auth.node.api.NodeProcessException;
 import org.forgerock.openam.auth.node.api.SingleOutcomeNode;
 import org.forgerock.openam.auth.node.api.TreeContext;
+import org.forgerock.openam.core.rest.devices.DevicePersistenceException;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -25,12 +30,6 @@ import org.slf4j.LoggerFactory;
 
 import com.google.inject.assistedinject.Assisted;
 
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-import okio.Buffer;
 
 /**
  * @author reshma.madan
@@ -65,7 +64,7 @@ public class KountTrustedDeviceNode extends SingleOutcomeNode {
 	 * @param config                  The config for this instance.
 	 */
 	@Inject
-	public KountTrustedDeviceNode(@Assisted Config config, HttpClientHandler client) {
+	public KountTrustedDeviceNode(@Assisted Config config) {
 		this.config = config;
 	}
 
@@ -74,19 +73,27 @@ public class KountTrustedDeviceNode extends SingleOutcomeNode {
 	public Action process(TreeContext context) throws NodeProcessException {
 		// TODO Auto-generated method stub
 		logger.debug("Kount Trusted Device started");
-		JsonValue loginApiResponseBody= context.sharedState.get("kountLoginResponseBody");
-		if(loginApiResponseBody!=null) {
-		loginApiResponseBody.getObject();
-		}
-		try {
-			JSONObject json = new JSONObject(loginApiResponseBody.asString());
-			decision=json.get("decision").toString();
-			deviceId=json.get("deviceId").toString();
-			AddTrustedDevice(context,decision,deviceId);
-		} catch (JSONException | NodeProcessException | DevicePersistenceException e) {
-			logger.debug("Exception in Kount Trusted Device "+e);
-			e.printStackTrace();
-		}
+		
+	    Boolean definedCheck  = context.sharedState.isDefined("kountLoginResponseBody");
+        if(definedCheck) {
+                        JsonValue loginApiResponseBody= context.sharedState.get("kountLoginResponseBody");
+                        loginApiResponseBody.getObject();
+                        try {
+                                        JSONObject json = new JSONObject(loginApiResponseBody.asString());
+                                        if(json!=null) {
+                                                        decision=json.get("decision").toString();
+                                            			deviceId=json.get("deviceId").toString();
+                                            			AddTrustedDevice(context,decision,deviceId);
+                                        }
+                        } catch (JSONException | DevicePersistenceException e) {
+                                        throw new NodeProcessException("Kount Login Response is null");
+                        }
+        }
+        else
+        {
+        	  throw new NodeProcessException("Kount Login Response is null");
+        }
+		
 		return goToNext().replaceSharedState(context.sharedState).build();
 	}
 
@@ -99,39 +106,20 @@ public class KountTrustedDeviceNode extends SingleOutcomeNode {
 			trustedDeviceState="TRUSTED";
 		}
 		try {
-			OkHttpClient client = new OkHttpClient().newBuilder().build();
 
+			StringBuilder builder;
 			//Read device
-			Request request1=readDeivceRequest(context,deviceId);
-			Response response1 = client.newCall(request1).execute();
-
-			//Call TrustedDevice ApI
-			Request request=callTrustedDeviceApi(context);
-			
+			int code=readDeivceConnection(context, deviceId);
+			HttpURLConnection connection=postTrustedDevice(context);
 			//if the device is not present
-			if(response1.code()>200) {
+			if(code>399) {
 				//Add the device
-				Response response = client.newCall(request).execute();
-				if(response.code()==200) {
-					context.sharedState.put("addTrusedDeiceiResponse", response);
-					context.sharedState.put("addTrusedDeiceiResponseBody", response.body().string());
+				builder = AddDevice(connection);
+				if(connection.getResponseCode()==200) {
+					context.sharedState.put("addTrusedDeiceiResponse", builder);
+					context.sharedState.put("addTrusedDeiceiResponseBody", builder.toString());
 				}
 			}
-			//if device is present
-			else if(response1.code()==200) {
-				JSONObject deviceListObject = new JSONObject(response1.body().string());
-				//get device details
-				JSONArray deviceList = deviceListObject.getJSONArray("details");
-				//if the device list is empty
-				if(deviceList.length()==0) {
-					//add the device
-					Response response = client.newCall(request).execute();
-					if(response.code()==200) {
-						context.sharedState.put("addTrusedDeiceiResponse", response);
-						context.sharedState.put("addTrusedDeiceiResponseBody", response.body().string());
-					}
-				}
-			} 
 		} catch (Exception e) {
 			logger.error("Unable to get TMX response for session: ");
 			throw new NodeProcessException(e);
@@ -139,27 +127,78 @@ public class KountTrustedDeviceNode extends SingleOutcomeNode {
 	}
 
 
-	private Request callTrustedDeviceApi(TreeContext context) {
-		MediaType mediaType = MediaType.parse("application/json");
-		RequestBody body = RequestBody.create(mediaType,"{\r\n\"clientId\": \""+context.sharedState.get("kountMerchant").asString()+"\",\r\n\"sessionId\": \""+context.sharedState.get("kountSession").asString()+"\",\r\n\"userId\": \""+context.sharedState.get(USERNAME).asString()+"\",\r\n\"trustState\": \""+trustedDeviceState+"\"\r\n}");
-		Request request = new Request.Builder()
-				.url("https://"+config.domain())
-				.method("POST", body)
-				.addHeader("Authorization", "Bearer "+context.sharedState.get("API_KEY").toString())
-				.addHeader("Content-Type", "application/json")
-				.build();
-		return request;
+	private StringBuilder AddDevice(HttpURLConnection connection2) throws IOException {
+		StringBuilder builder = new StringBuilder();
+		if(connection2.getResponseCode()==200) {
+		InputStreamReader in = new InputStreamReader((InputStream) connection2.getContent());
+		BufferedReader buff = new BufferedReader(in);
+		String line;
+		do {
+			line = buff.readLine();
+			builder.append(line).append("\n");
+		} while (line != null);
+		buff.close();
+		}
+		return builder;
 	}
 
 
-	private Request readDeivceRequest(TreeContext context, String deviceId2) {
-		Request request1 = new Request.Builder()  
-				.url("https://api-qa06.kount.com/trusted-device/devices/"+deviceId+"/clients/"+context.sharedState.get("kountMerchant").asString()+"/users")
-				.method("GET", null)
-				.addHeader("Authorization", "Bearer "+context.sharedState.get("API_KEY").toString())
-				.addHeader("Content-Type", "application/json")
-				.build();
-		return request1;
+	private HttpURLConnection postTrustedDevice(TreeContext context) {
+		HttpURLConnection connection = null;
+		try {
+			String uri="https://"+config.domain();
+			URL url = new URL(uri);
+			connection = (HttpURLConnection) url.openConnection();
+			// Now it's "open", we can set the request method, headers etc.
+			connection.setRequestProperty("accept", "application/json");
+			connection.setRequestProperty ("Authorization", "Bearer "+context.sharedState.get("API_KEY").toString());
+			connection.setRequestMethod("POST");
+			connection.setDoOutput(true);
+			OutputStream os = connection.getOutputStream();
+			OutputStreamWriter osw = new OutputStreamWriter(os, "UTF-8");    
+			osw.write("{\r\n\"clientId\": \""+context.sharedState.get("kountMerchant").asString()+"\",\r\n\"sessionId\": \""+context.sharedState.get("kountSession").asString()+"\",\r\n\"userId\": \""+context.sharedState.get(USERNAME).asString()+"\",\r\n\"trustState\": \""+trustedDeviceState+"\"\r\n}");
+			osw.flush();
+			osw.close();
+			os.close();  //don't forget to close the OutputStream
+			connection.connect();
+
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return connection;
+
+
+	}
+
+
+	int readDeivceConnection(TreeContext context, String deviceId2) throws IOException {
+		String str1 = "Bearer ";
+		String str2 = context.sharedState.get("API_KEY").toString();
+		String str22=str2.substring(1, str2.length()-1);
+		String bearerToken = str1.concat(str22);
+
+		String urlstr = "https://api-qa06.kount.com/trusted-device/devices/"+deviceId+"/clients/"+context.sharedState.get("kountMerchant").asString()+"/users";
+		URL url = new URL(urlstr);
+		HttpURLConnection	connection = (HttpURLConnection) url.openConnection();
+		connection.setRequestMethod("GET");
+		connection.setRequestProperty ("Authorization",bearerToken);
+
+		int code=connection.getResponseCode();
+		
+		if(code>399) {
+			return code;
+		}else {
+			BufferedReader buff1 = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+			String line1;
+			StringBuilder builder1 = new StringBuilder();
+			do {
+				line1= buff1.readLine();
+				builder1.append(line1).append("\n");
+			} while (line1 != null);
+			buff1.close();
+		}
+		return code;
 	}
 
 }

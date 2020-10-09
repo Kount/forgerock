@@ -1,0 +1,4 @@
+com\kount\authnode\KountLoginNodeTest.class
+com\kount\authnode\KountEventsNodeTest.class
+com\kount\authnode\KountTrustedDeviceNodeTest.class
+com\kount\authnode\KountDecisionNodeTest.class
