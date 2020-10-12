@@ -73,34 +73,34 @@ public class KountTrustedDeviceNode extends SingleOutcomeNode {
 	public Action process(TreeContext context) throws NodeProcessException {
 		// TODO Auto-generated method stub
 		logger.debug("Kount Trusted Device started");
-		
-	    Boolean definedCheck  = context.sharedState.isDefined("kountLoginResponseBody");
-        if(definedCheck) {
-                        JsonValue loginApiResponseBody= context.sharedState.get("kountLoginResponseBody");
-                        loginApiResponseBody.getObject();
-                        try {
-                                        JSONObject json = new JSONObject(loginApiResponseBody.asString());
-                                        if(json!=null) {
-                                                        decision=json.get("decision").toString();
-                                            			deviceId=json.get("deviceId").toString();
-                                            			AddTrustedDevice(context,decision,deviceId);
-                                        }
-                        } catch (JSONException | DevicePersistenceException e) {
-                                        throw new NodeProcessException("Kount Login Response is null");
-                        }
-        }
-        else
-        {
-        	  throw new NodeProcessException("Kount Login Response is null");
-        }
-		
+
+		Boolean definedCheck  = context.sharedState.isDefined("kountLoginResponseBody");
+		if(definedCheck) {
+			JsonValue loginApiResponseBody= context.sharedState.get("kountLoginResponseBody");
+			loginApiResponseBody.getObject();
+			try {
+				JSONObject json = new JSONObject(loginApiResponseBody.asString());
+				if(json!=null) {
+					decision=json.get("decision").toString();
+					deviceId=json.get("deviceId").toString();
+					AddTrustedDevice(context,decision,deviceId);
+				}
+			} catch (JSONException | DevicePersistenceException e) {
+				throw new NodeProcessException("Kount Login Response is null");
+			}
+		}
+		else
+		{
+			throw new NodeProcessException("Kount Login Response is null");
+		}
+
 		return goToNext().replaceSharedState(context.sharedState).build();
 	}
 
 	private void AddTrustedDevice(TreeContext context, String decision, String deviceId) throws NodeProcessException, DevicePersistenceException {
-		if(decision.equalsIgnoreCase("Challenge")) {
+		if("Challenge".equalsIgnoreCase(decision) ) {
 			trustedDeviceState="UNASSIGNED";
-		}else if(decision.equalsIgnoreCase("BLock")) {
+		}else if("Block".equalsIgnoreCase(decision) ) {
 			trustedDeviceState="BANNED";
 		}else {
 			trustedDeviceState="TRUSTED";
@@ -109,10 +109,10 @@ public class KountTrustedDeviceNode extends SingleOutcomeNode {
 
 			StringBuilder builder;
 			//Read device
-			int code=readDeivceConnection(context, deviceId);
+			HttpURLConnection readDeviceConnection=readDeivceConnection(context, deviceId);
 			HttpURLConnection connection=postTrustedDevice(context);
-			//if the device is not present
-			if(code>399) {
+			//if the device is not present the response code will be 404 or greater
+			if(readDeviceConnection.getResponseCode()==404) {
 				//Add the device
 				builder = AddDevice(connection);
 				if(connection.getResponseCode()==200) {
@@ -130,14 +130,14 @@ public class KountTrustedDeviceNode extends SingleOutcomeNode {
 	private StringBuilder AddDevice(HttpURLConnection connection2) throws IOException {
 		StringBuilder builder = new StringBuilder();
 		if(connection2.getResponseCode()==200) {
-		InputStreamReader in = new InputStreamReader((InputStream) connection2.getContent());
-		BufferedReader buff = new BufferedReader(in);
-		String line;
-		do {
-			line = buff.readLine();
-			builder.append(line).append("\n");
-		} while (line != null);
-		buff.close();
+			InputStreamReader in = new InputStreamReader((InputStream) connection2.getContent());
+			BufferedReader buff = new BufferedReader(in);
+			String line;
+			do {
+				line = buff.readLine();
+				builder.append(line).append("\n");
+			} while (line != null);
+			buff.close();
 		}
 		return builder;
 	}
@@ -150,10 +150,7 @@ public class KountTrustedDeviceNode extends SingleOutcomeNode {
 			URL url = new URL(uri);
 			connection = (HttpURLConnection) url.openConnection();
 			// Now it's "open", we can set the request method, headers etc.
-			connection.setRequestProperty("accept", "application/json");
-			connection.setRequestProperty ("Authorization", "Bearer "+context.sharedState.get("API_KEY").toString());
-			connection.setRequestMethod("POST");
-			connection.setDoOutput(true);
+			HttpConnection.setUpHttpPostConnection(connection, context.sharedState.get("API_KEY").toString());
 			OutputStream os = connection.getOutputStream();
 			OutputStreamWriter osw = new OutputStreamWriter(os, "UTF-8");    
 			osw.write("{\r\n\"clientId\": \""+context.sharedState.get("kountMerchant").asString()+"\",\r\n\"sessionId\": \""+context.sharedState.get("kountSession").asString()+"\",\r\n\"userId\": \""+context.sharedState.get(USERNAME).asString()+"\",\r\n\"trustState\": \""+trustedDeviceState+"\"\r\n}");
@@ -172,7 +169,7 @@ public class KountTrustedDeviceNode extends SingleOutcomeNode {
 	}
 
 
-	int readDeivceConnection(TreeContext context, String deviceId2) throws IOException {
+	private HttpURLConnection readDeivceConnection(TreeContext context, String deviceId2) throws IOException {
 		String str1 = "Bearer ";
 		String str2 = context.sharedState.get("API_KEY").toString();
 		String str22=str2.substring(1, str2.length()-1);
@@ -184,21 +181,7 @@ public class KountTrustedDeviceNode extends SingleOutcomeNode {
 		connection.setRequestMethod("GET");
 		connection.setRequestProperty ("Authorization",bearerToken);
 
-		int code=connection.getResponseCode();
-		
-		if(code>399) {
-			return code;
-		}else {
-			BufferedReader buff1 = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-			String line1;
-			StringBuilder builder1 = new StringBuilder();
-			do {
-				line1= buff1.readLine();
-				builder1.append(line1).append("\n");
-			} while (line1 != null);
-			buff1.close();
-		}
-		return code;
+		return connection;
 	}
 
 }

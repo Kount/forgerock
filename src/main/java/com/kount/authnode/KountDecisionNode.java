@@ -70,11 +70,11 @@ public class KountDecisionNode implements Node{
                                 {
                                                 return Action.goTo("Failure").build();
                                 }
-                                if(decision.equalsIgnoreCase("Challenge")) {
+                                if("Challenge".equalsIgnoreCase(decision)) {
                                                 return Action.goTo("Challenge").build();
-                                }else if(decision.equalsIgnoreCase("Block")) {
+                                }else if("Block".equalsIgnoreCase(decision)) {
                                                 return Action.goTo("Failure").build();
-                                }else if(decision.equalsIgnoreCase("Allow")) {
+                                }else if("Allow".equalsIgnoreCase(decision)) {
                                                 return Action.goTo("Success").build();
                                 }else{
                                                 logger.debug("Error in Kount Decision Node ");

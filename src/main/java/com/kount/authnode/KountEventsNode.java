@@ -85,7 +85,7 @@ public class KountEventsNode extends SingleOutcomeNode {
 	 */
 	private void callEventsAPI(TreeContext context, AMIdentity id) throws NodeProcessException {
 		try {
-			HttpURLConnection connection=gePostConnection(context,id);
+			HttpURLConnection connection=postEventsAPI(context,id);
 			InputStreamReader in = new InputStreamReader((InputStream) connection.getContent());
 			BufferedReader buff = new BufferedReader(in);
 			String line;
@@ -107,7 +107,7 @@ public class KountEventsNode extends SingleOutcomeNode {
 	 * @param context
 	 * @return
 	 */
-	private HttpURLConnection gePostConnection(TreeContext context, AMIdentity identity) {
+	private HttpURLConnection postEventsAPI(TreeContext context, AMIdentity identity) {
 		String ip="";
 		HttpURLConnection connection = null;
 		try {
@@ -118,10 +118,7 @@ public class KountEventsNode extends SingleOutcomeNode {
 				URL url = new URL(uri);
 				connection = (HttpURLConnection) url.openConnection();
 				// Now it's "open", we can set the request method, headers etc.
-				connection.setRequestProperty("accept", "application/json");
-				connection.setRequestProperty ("Authorization", "Bearer "+config.API_KEY());
-				connection.setRequestMethod("POST");
-				connection.setDoOutput(true);
+				HttpConnection.setUpHttpPostConnection(connection, config.API_KEY());
 				OutputStream os = connection.getOutputStream();
 				OutputStreamWriter osw = new OutputStreamWriter(os, "UTF-8");    
 				osw.write("{\r\n  \"failedAttempt\": {\r\n \"clientId\": \""+context.sharedState.get("kountMerchant").asString()+"\",\r\n\"sessionId\": \""+context.sharedState.get("kountSession").asString()+"\",\r\n\"username\": \""+context.sharedState.get(USERNAME).asString()+"\",\r\n\"userPassword\": \""+encryptedPwd.run().toString()+"\",\r\n\"userIp\": \""+ip+"\"\r\n}\r\n}");
