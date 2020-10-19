@@ -1,7 +1,6 @@
 package com.kount.authnode;
 
 import static org.forgerock.openam.auth.node.api.SharedStateConstants.PASSWORD;
-import static org.forgerock.openam.auth.node.api.SharedStateConstants.REALM;
 import static org.forgerock.openam.auth.node.api.SharedStateConstants.USERNAME;
 
 import java.io.BufferedReader;
@@ -12,10 +11,10 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 
 import javax.inject.Inject;
 
-import org.forgerock.http.handler.HttpClientHandler;
 import org.forgerock.json.JsonValue;
 import org.forgerock.openam.annotations.sm.Attribute;
 import org.forgerock.openam.auth.node.api.Action;
@@ -27,8 +26,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.inject.assistedinject.Assisted;
-import com.sun.identity.idm.AMIdentity;
-import com.sun.identity.idm.IdUtils;
 import com.sun.identity.security.EncryptAction;
 
 /**
@@ -48,6 +45,9 @@ public class KountEventsNode extends SingleOutcomeNode {
 	public interface Config {
 		
 		@Attribute(order = 100, requiredValue = true)
+		//TODO method names should be camelcase
+		//TODO Type should be char[] so that text is not shown in the UI
+		//TODO Should not have a default value
 		default String API_KEY() {
 			return "API Key";
 		}
@@ -63,29 +63,25 @@ public class KountEventsNode extends SingleOutcomeNode {
 	@Inject
 	public KountEventsNode(@Assisted Config config) {
 		this.config = config;
-	}	
+	}
+
 	@Override
 	public Action process(TreeContext context) throws NodeProcessException {
 		logger.debug("Kount Login Events started");
 		String userHandle = context.sharedState.get(USERNAME).asString();
-		if(userHandle!=null) {
-			AMIdentity id = IdUtils.getIdentity(userHandle, context.sharedState.get(REALM).asString());
+		if (userHandle != null) {
 			context.sharedState.put("API_KEY", config.API_KEY());
-			callEventsAPI(context,id);
-		}else {
+			callEventsAPI(context);
+		} else {
 			throw new NodeProcessException("User Name is empty");
 		}
 		return goToNext().replaceSharedState(context.sharedState).build();
 	}
-	
-	/**
-	 * @param context
-	 * @param id 
-	 * @throws NodeProcessException
-	 */
-	private void callEventsAPI(TreeContext context, AMIdentity id) throws NodeProcessException {
+
+	private void callEventsAPI(TreeContext context) throws NodeProcessException {
 		try {
-			HttpURLConnection connection=postEventsAPI(context,id);
+			HttpURLConnection connection = postEventsAPI(context);
+			//TODO Duplicate code in KountLoginNode, look to externalize
 			InputStreamReader in = new InputStreamReader((InputStream) connection.getContent());
 			BufferedReader buff = new BufferedReader(in);
 			String line;
@@ -103,32 +99,34 @@ public class KountEventsNode extends SingleOutcomeNode {
 			throw new NodeProcessException(e);
 		}
 	}
-	/**
-	 * @param context
-	 * @return
-	 */
-	private HttpURLConnection postEventsAPI(TreeContext context, AMIdentity identity) {
+
+
+	private HttpURLConnection postEventsAPI(TreeContext context) {
 		String ip="";
 		HttpURLConnection connection = null;
 		try {
-
-				JsonValue transientState = context.transientState;
-				EncryptAction encryptedPwd=new EncryptAction(transientState.get(PASSWORD).asString());
-				String uri="https://"+config.domain();
-				URL url = new URL(uri);
-				connection = (HttpURLConnection) url.openConnection();
-				// Now it's "open", we can set the request method, headers etc.
-				HttpConnection.setUpHttpPostConnection(connection, config.API_KEY());
-				OutputStream os = connection.getOutputStream();
-				OutputStreamWriter osw = new OutputStreamWriter(os, "UTF-8");    
-				osw.write("{\r\n  \"failedAttempt\": {\r\n \"clientId\": \""+context.sharedState.get("kountMerchant").asString()+"\",\r\n\"sessionId\": \""+context.sharedState.get("kountSession").asString()+"\",\r\n\"username\": \""+context.sharedState.get(USERNAME).asString()+"\",\r\n\"userPassword\": \""+encryptedPwd.run().toString()+"\",\r\n\"userIp\": \""+ip+"\"\r\n}\r\n}");
-				osw.flush();
+			//TODO Duplicate code in KountLoginNode, look to externalize
+			JsonValue transientState = context.transientState;
+			EncryptAction encryptedPwd = new EncryptAction(transientState.get(PASSWORD).asString());
+			String uri = "https://" + config.domain();
+			URL url = new URL(uri);
+			connection = (HttpURLConnection) url.openConnection();
+			// Now it's "open", we can set the request method, headers etc.
+			HttpConnection.setUpHttpPostConnection(connection, config.API_KEY());
+			OutputStream os = connection.getOutputStream();
+			OutputStreamWriter osw = new OutputStreamWriter(os, StandardCharsets.UTF_8);
+			osw.write("{\r\n  \"failedAttempt\": {\r\n \"clientId\": \"" +
+							  context.sharedState.get("kountMerchant").asString() + "\",\r\n\"sessionId\": \"" +
+							  context.sharedState.get("kountSession").asString() + "\",\r\n\"username\": \"" +
+							  context.sharedState.get(USERNAME).asString() + "\",\r\n\"userPassword\": \"" +
+							  encryptedPwd.run().toString() + "\",\r\n\"userIp\": \"" + ip + "\"\r\n}\r\n}");
+			osw.flush();
 				osw.close();
 				os.close();  //don't forget to close the OutputStream
 				connection.connect();
 
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
+			// TODO Add exception handling
 			e.printStackTrace();
 		}
 		return connection;

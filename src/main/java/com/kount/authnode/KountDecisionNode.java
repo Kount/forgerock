@@ -20,82 +20,74 @@ import com.google.common.collect.ImmutableList;
 import com.google.inject.assistedinject.Assisted;
 
 /**
-* @author reshma.madan
-*
-*/
-@Node.Metadata(outcomeProvider = KountDecisionNode.KountDecisionOutcomeProvider.class, 
-configClass = KountDecisionNode.Config.class, tags = {
-"risk" })
-public class KountDecisionNode implements Node{
+ * @author reshma.madan
+ */
+@Node.Metadata(outcomeProvider = KountDecisionNode.KountDecisionOutcomeProvider.class,
+        configClass = KountDecisionNode.Config.class, tags = {
+        "risk"})
+public class KountDecisionNode implements Node {
 
-                private final Logger logger = LoggerFactory.getLogger(KountDecisionNode.class);
-                String decision="";
-                /**
-                * Configuration for the node.
-                */
-                public interface Config {
+    private final Logger logger = LoggerFactory.getLogger(KountDecisionNode.class);
+    String decision = "";
 
-                }
+    /**
+     * Configuration for the node.
+     */
+    public interface Config {
 
-                /**
-                * Guice constructor.
-                *
-                * @param coreWrapper             A core wrapper instance.
-                * @param identityUtils           An instance of the IdentityUtils.
-                * @param amAccountLockoutFactory factory for generating account lockout
-                *                                objects.
-                * @param config                  The config for this instance.
-                */
-                @Inject
-                public KountDecisionNode(@Assisted Config config) {
-                }
+    }
 
-                @Override
-                public Action process(TreeContext context) throws NodeProcessException {
-                                logger.debug("Kount Decision Node started");
-                                Boolean definedCheck  = context.sharedState.isDefined("kountLoginResponseBody");
-                                if(definedCheck) {
-                                                JsonValue loginApiResponseBody= context.sharedState.get("kountLoginResponseBody");
-                                                loginApiResponseBody.getObject();
-                                                try {
-                                                                JSONObject json = new JSONObject(loginApiResponseBody.asString());
-                                                                if(json!=null) {
-                                                                                decision=json.get("decision").toString();
-                                                                }
-                                                } catch (JSONException e) {
-                                                                throw new NodeProcessException("Kount Login Response is null");
-                                                }
-                                }
-                                else
-                                {
-                                                return Action.goTo("Failure").build();
-                                }
-                                if("Challenge".equalsIgnoreCase(decision)) {
-                                                return Action.goTo("Challenge").build();
-                                }else if("Block".equalsIgnoreCase(decision)) {
-                                                return Action.goTo("Failure").build();
-                                }else if("Allow".equalsIgnoreCase(decision)) {
-                                                return Action.goTo("Success").build();
-                                }else{
-                                                logger.debug("Error in Kount Decision Node ");
-                                                return Action.goTo("Failure").build();
-                                }
-                }
+    /**
+     * Guice constructor.
+     *
+     * @param config The config for this instance.
+     */
+    @Inject
+    public KountDecisionNode(@Assisted Config config) {
+    }
 
-                public enum KountDecisionOutcome {
-                                Success,
-                                Failure,
-                                Challenge
-                }
+    @Override
+    public Action process(TreeContext context) throws NodeProcessException {
+        logger.debug("Kount Decision Node started");
+        boolean definedCheck = context.sharedState.isDefined("kountLoginResponseBody");
+        if (definedCheck) {
+            JsonValue loginApiResponseBody = context.sharedState.get("kountLoginResponseBody");
+            loginApiResponseBody.getObject();
+            try {
+                JSONObject json = new JSONObject(loginApiResponseBody.asString());
+                decision = json.get("decision").toString();
+            } catch (JSONException e) {
+                throw new NodeProcessException("Kount Login Response is null");
+            }
+        } else {
+            return Action.goTo("Failure").build();
+        }
+        if ("Challenge".equalsIgnoreCase(decision)) {
+            return Action.goTo("Challenge").build();
+        } else if ("Block".equalsIgnoreCase(decision)) {
+            return Action.goTo("Failure").build();
+        } else if ("Allow".equalsIgnoreCase(decision)) {
+            return Action.goTo("Success").build();
+        } else {
+            logger.debug("Error in Kount Decision Node ");
+            return Action.goTo("Failure").build();
+        }
+    }
 
-                public static class KountDecisionOutcomeProvider implements OutcomeProvider {
-                                @Override
-                                public List<Outcome> getOutcomes(PreferredLocales locales, JsonValue nodeAttributes) {
-                                                return ImmutableList.of(
-                                                                                new Outcome(KountDecisionOutcome.Success.name(), "Success"),
-                                                                                new Outcome(KountDecisionOutcome.Failure.name(), "Failure"),
-                                                                                new Outcome(KountDecisionOutcome.Challenge.name(),"Challenge" ));
-                                }
-                }
+    public enum KountDecisionOutcome {
+        Success,
+        Failure,
+        Challenge
+    }
+
+    public static class KountDecisionOutcomeProvider implements OutcomeProvider {
+        @Override
+        public List<Outcome> getOutcomes(PreferredLocales locales, JsonValue nodeAttributes) {
+            return ImmutableList.of(
+                    new Outcome(KountDecisionOutcome.Success.name(), "Success"),
+                    new Outcome(KountDecisionOutcome.Failure.name(), "Failure"),
+                    new Outcome(KountDecisionOutcome.Challenge.name(), "Challenge"));
+        }
+    }
 
 }

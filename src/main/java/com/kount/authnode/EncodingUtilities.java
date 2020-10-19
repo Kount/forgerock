@@ -7,6 +7,7 @@ import org.forgerock.util.encode.Base64url;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+//TODO Why is EncodingUtilities in this repository?
 public class EncodingUtilities {
 
     private static final Logger logger = LoggerFactory.getLogger(EncodingUtilities.class);

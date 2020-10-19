@@ -13,7 +13,6 @@ import java.net.URL;
 
 import javax.inject.Inject;
 
-import org.forgerock.http.handler.HttpClientHandler;
 import org.forgerock.json.JsonValue;
 import org.forgerock.openam.annotations.sm.Attribute;
 import org.forgerock.openam.auth.node.api.Action;
@@ -21,8 +20,6 @@ import org.forgerock.openam.auth.node.api.Node;
 import org.forgerock.openam.auth.node.api.NodeProcessException;
 import org.forgerock.openam.auth.node.api.SingleOutcomeNode;
 import org.forgerock.openam.auth.node.api.TreeContext;
-import org.forgerock.openam.core.rest.devices.DevicePersistenceException;
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -42,7 +39,9 @@ public class KountTrustedDeviceNode extends SingleOutcomeNode {
 
 	private final Logger logger = LoggerFactory.getLogger(KountTrustedDeviceNode.class);
 	private final Config config;
-	String decision="",matchedToDevice="",deviceId="",trustedDeviceState="";
+	String decision="";
+	String deviceId="";
+	String trustedDeviceState="";
 	/**
 	 * Configuration for the node.
 	 */
@@ -56,11 +55,6 @@ public class KountTrustedDeviceNode extends SingleOutcomeNode {
 
 	/**
 	 * Guice constructor.
-	 *
-	 * @param coreWrapper             A core wrapper instance.
-	 * @param identityUtils           An instance of the IdentityUtils.
-	 * @param amAccountLockoutFactory factory for generating account lockout
-	 *                                objects.
 	 * @param config                  The config for this instance.
 	 */
 	@Inject

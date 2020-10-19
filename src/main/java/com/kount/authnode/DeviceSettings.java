@@ -6,6 +6,8 @@ import java.util.UUID;
 import org.forgerock.util.Reject;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+
+//TODO Why is DeviceSettings in this repoistory?
 public abstract class DeviceSettings {
 
     @JsonIgnore

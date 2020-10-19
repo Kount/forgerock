@@ -1,5 +1,5 @@
 package com.kount.authnode;
-
+//TODO Why is ClientScriptResponse in this repository?
 public abstract class ClientScriptResponse {
 
     private final String clientData;

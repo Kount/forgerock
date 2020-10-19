@@ -7,6 +7,8 @@ import org.forgerock.openam.utils.StringUtils;
 import org.forgerock.util.Reject;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+
+//TODO Why are WebAuthNDevice Settings in this repository?
 public class WebAuthnDeviceSettings extends DeviceSettings {
 
     private String credentialId;

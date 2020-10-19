@@ -1,6 +1,8 @@
 package com.kount.authnode;
 import java.util.Set;
 import org.forgerock.json.JsonException;
+
+//TODO Why is KeyType in this repository?
 public enum KeyType {
     /**
      * RSA key.

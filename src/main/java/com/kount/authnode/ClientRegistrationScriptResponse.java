@@ -1,5 +1,7 @@
 package com.kount.authnode;
 
+//TODO Why is ClientRegistrationScriptResponse in this repository?
+
 public class ClientRegistrationScriptResponse extends ClientScriptResponse {
 
     private final byte[] attestationData;

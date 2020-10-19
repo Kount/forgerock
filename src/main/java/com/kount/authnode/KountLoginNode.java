@@ -34,6 +34,7 @@ import com.sun.identity.idm.IdRepoException;
 import com.sun.identity.idm.IdUtils;
 import com.sun.identity.security.EncryptAction;
 
+//TODO Update Javadoc
 /**
  * A node that locks a user account (sets the user as "inactive").
  */
@@ -53,16 +54,22 @@ public class KountLoginNode extends SingleOutcomeNode {
 	 * Configuration for the node.
 	 */
 	public interface Config {
+		//TODO method names should be camelcase
+		//TODO Type should be char[] so that text is not shown in the UI
+		//TODO Should not have a default value
 		@Attribute(order = 100, requiredValue = true)
 		default String API_KEY() {
 			return "API Key";
 		}
 
+		//TODO Default value should be an example Server URL
 		@Attribute(order = 200, requiredValue = true)
 		default String domain() {
 			return "Server URL";
 		}
 
+		//TODO method names should be camelcase
+		//TODO Default value should be an unqiue identifier
 		@Attribute(order = 300,requiredValue = true)
 		default String unique_Identifier() {
 			return "Unique Identifier";

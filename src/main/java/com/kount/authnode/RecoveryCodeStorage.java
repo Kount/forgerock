@@ -10,6 +10,8 @@ import java.util.stream.Collectors;
 import org.forgerock.openam.shared.security.crypto.Hashes;
 
 import com.iplanet.am.util.SystemProperties;
+
+//TODO Why is RecoveryCodeStorage in this repository?
 public enum RecoveryCodeStorage {
     /**
      * Recovery codes are hashed using a salted strong one-way hash function and so are not recoverable after initial

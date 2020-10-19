@@ -4,23 +4,24 @@ import static org.forgerock.openam.auth.node.api.Action.send;
 
 import java.util.Optional;
 import java.util.UUID;
+
 import javax.inject.Inject;
-import javax.security.auth.callback.Callback;
+
+import org.forgerock.json.JsonValue;
 import org.forgerock.openam.annotations.sm.Attribute;
 import org.forgerock.openam.auth.node.api.Action;
 import org.forgerock.openam.auth.node.api.Node;
 import org.forgerock.openam.auth.node.api.NodeProcessException;
 import org.forgerock.openam.auth.node.api.SingleOutcomeNode;
 import org.forgerock.openam.auth.node.api.TreeContext;
-import org.forgerock.openam.auth.nodes.webauthn.ClientScriptUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.assistedinject.Assisted;
 import com.sun.identity.authentication.callbacks.HiddenValueCallback;
 import com.sun.identity.authentication.callbacks.ScriptTextOutputCallback;
-import org.forgerock.json.JsonValue;
-import com.google.common.base.Strings;
 
 @Node.Metadata(outcomeProvider = SingleOutcomeNode.OutcomeProvider.class, 
 configClass = KountProfilerNode.Config.class, tags = {
@@ -29,9 +30,7 @@ public class KountProfilerNode extends SingleOutcomeNode {
 
 	private final Logger logger = LoggerFactory.getLogger(KountProfilerNode.class);
 	private final Config config;	
-	private ClientScriptUtilities scriptUtils;
-
-
+	private final ClientScriptUtilities scriptUtils;
 
 	static final String RESOURCE_LOCATION = "com/kount/authnode/";
 	static final String DATA_COLLECTOR = RESOURCE_LOCATION + "dataCollector.js";
@@ -41,13 +40,14 @@ public class KountProfilerNode extends SingleOutcomeNode {
 	 * Configuration for the node.
 	 */
 	public interface Config {
-
+		//TODO Should have an example default value of what a merchantId should look like
 		@Attribute(order = 100,requiredValue = true)
 		default String merchantId() {
 			// domain
 			return "Merchant ID";
 		}
 
+		//TODO Should have an example default value of what valid domain would look like
 		@Attribute(order = 200,requiredValue = true)
 		default String domain() {
 			// domain
@@ -59,11 +59,7 @@ public class KountProfilerNode extends SingleOutcomeNode {
 	/**
 	 * Guice constructor.
 	 *
-	 * @param coreWrapper             A core wrapper instance.
-	 * @param identityUtils           An instance of the IdentityUtils.
-	 * @param amAccountLockoutFactory factory for generating account lockout
-	 *                                objects.
-	 * @param config                  The config for this instance.
+	 * @param config The config for this instance.
 	 */
 	@Inject
 	public KountProfilerNode(@Assisted Config config, ClientScriptUtilities scriptUtil) {
@@ -73,7 +69,8 @@ public class KountProfilerNode extends SingleOutcomeNode {
 
 	@Override
 	public Action process(TreeContext context) throws NodeProcessException {
-		Optional<String> result = context.getCallback(HiddenValueCallback.class).map(HiddenValueCallback::getValue).filter(scriptOutput -> !Strings.isNullOrEmpty(scriptOutput));
+		Optional<String> result = context.getCallback(HiddenValueCallback.class).map(HiddenValueCallback::getValue)
+										 .filter(scriptOutput -> !Strings.isNullOrEmpty(scriptOutput));
 		if (result.isPresent()) {
 			JsonValue newSharedState = context.sharedState.copy();
 			newSharedState.put("kountResult", result.get());
@@ -81,21 +78,12 @@ public class KountProfilerNode extends SingleOutcomeNode {
 		} else {
 			final String sessionID = UUID.randomUUID().toString().replace("-", "");
 			logger.debug("Kount Profiler Node started");
-			StringBuilder callback =new StringBuilder();
-			callback.append(dataCollectorJS(sessionID));
-			callback.append("\n");
-			callback.append(addClassToBodyJS());
 			context.sharedState.put("kountSession", sessionID);
 			context.sharedState.put("kountMerchant",config.merchantId());
 
-			ScriptTextOutputCallback scriptAndSelfSubmitCallback =
-					new ScriptTextOutputCallback(callback.toString());
-
-			HiddenValueCallback hiddenValueCallback = new HiddenValueCallback("kountResult");
-
-			ImmutableList<Callback> callbacks = ImmutableList.of(scriptAndSelfSubmitCallback, hiddenValueCallback);
-
-			return send(callbacks).build();
+			return send(ImmutableList.of(
+					new ScriptTextOutputCallback(dataCollectorJS(sessionID) + "\n" + addClassToBodyJS()),
+					new HiddenValueCallback("kountResult"))).build();
 		}
 	}
 
@@ -109,8 +97,7 @@ public class KountProfilerNode extends SingleOutcomeNode {
 	}
 
 	private String addClassToBodyJS() throws NodeProcessException {
-		String dataCollector = scriptUtils.getScriptAsString(BODY_CLASS);
-		return dataCollector;
+		return scriptUtils.getScriptAsString(BODY_CLASS);
 	}
 
 

@@ -1,5 +1,6 @@
 package com.kount.authnode;
 
+//TODO Why is DevicePersistenceException in this repository?
 public class DevicePersistenceException extends Exception {
 
     /**

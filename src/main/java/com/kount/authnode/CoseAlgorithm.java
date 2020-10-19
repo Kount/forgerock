@@ -1,5 +1,5 @@
 package com.kount.authnode;
-
+//TODO Why is CoseAlgorithm in this repository?
 public enum CoseAlgorithm {
 
     /** the es256 algorithm. */
