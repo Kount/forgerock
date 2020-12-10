@@ -1,0 +1,8 @@
+*.idea
+*.iml
+.settings/*
+.classpath
+.gitlab-ci.yml
+.factorypath
+.project
+target/*
