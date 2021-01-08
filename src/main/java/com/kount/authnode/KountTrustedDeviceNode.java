@@ -25,10 +25,11 @@ import com.kount.authnode.HttpConnection.HTTPResponse;
 import com.sun.identity.sm.RequiredValueValidator;
 
 /**
- * The KountTrustedDeviceNode is a single-outcome node which should be used
- * when Kount Control responds with Allow (Success) or Challenge.
- * The node is responsible for checking whether the given device is already on the trusted device list,
- * and adding the device to the trusted device list if it’s not
+ * The KountTrustedDeviceNode is a single-outcome node which should be used when
+ * Kount Control responds with Allow (Success) or Challenge. The node is
+ * responsible for checking whether the given device is already on the trusted
+ * device list, and adding the device to the trusted device list if it’s not
+ * 
  * @author reshma.madan
  *
  */
@@ -54,13 +55,28 @@ public class KountTrustedDeviceNode extends SingleOutcomeNode {
 	public interface Config {
 
 		/**
-		 * Domain.
+		 * Trusted device domain option.
 		 *
-		 * @return the string
+		 * @return the trusted device domain option
 		 */
-		@Attribute(order = 200, validators = { RequiredValueValidator.class, URLValidator.class })
-		default String domain() {
-			return Constants.KOUNT_TRUSTED_DEVICE_DOMAIN;
+		@Attribute(order = 200, validators = { RequiredValueValidator.class })
+		default TrustedDeviceDomainOption trustedDeviceDomainOption() {
+			return TrustedDeviceDomainOption.SANDBOX;
+		}
+	}
+
+	/**
+	 * The Enum TrustedDeviceDomainOption.
+	 */
+	public enum TrustedDeviceDomainOption {
+
+		PRODUCTION(Constants.KOUNT_PRODUCTION_SERVER + Constants.KOUNT_TRUSTED_DEVICE_API_ENDPOINT),
+		SANDBOX(Constants.KOUNT_SANDBOX_SERVER + Constants.KOUNT_TRUSTED_DEVICE_API_ENDPOINT);
+
+		String domainOption;
+
+		TrustedDeviceDomainOption(String domainOption) {
+			this.domainOption = domainOption;
 		}
 	}
 
@@ -172,7 +188,8 @@ public class KountTrustedDeviceNode extends SingleOutcomeNode {
 		try {
 
 			String payload = getRequestPayload(context);
-			connection = httpConnection.post(config.domain(), payload, context.sharedState.get("API_KEY").asString());
+			connection = httpConnection.post(config.trustedDeviceDomainOption().domainOption, payload,
+					context.sharedState.get("API_KEY").asString());
 		} catch (Exception e) {
 			logger.error(
 					"ERROR: KountTrustedDeviceNode.postTrustedDevice(), Unable to post Trusted Device API, Message:"
@@ -193,8 +210,8 @@ public class KountTrustedDeviceNode extends SingleOutcomeNode {
 		logger.debug("In KountTrustedDeviceNode.readDeviceConnection()");
 		HttpURLConnection connection;
 
-		String uri = config.domain().concat(MessageFormat.format(Constants.API_GET_TRUSTED_DEVICE_PATH, deviceId,
-				context.sharedState.get("kountMerchant").asString()));
+		String uri = config.trustedDeviceDomainOption().domainOption.concat(MessageFormat.format(
+				Constants.API_GET_TRUSTED_DEVICE_PATH, deviceId, context.sharedState.get("kountMerchant").asString()));
 
 		connection = httpConnection.get(uri, context.sharedState.get("API_KEY").asString());
 

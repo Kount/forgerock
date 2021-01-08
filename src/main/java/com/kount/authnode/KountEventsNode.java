@@ -32,8 +32,10 @@ import com.sun.identity.idm.IdUtils;
 import com.sun.identity.sm.RequiredValueValidator;
 
 /**
- *   The KountEventsNode is a single-outcome node which should be used to record a failed login or a failed MFA check,
- *   which feeds into Kount’s service to help inform future risk inquiries.
+ * The KountEventsNode is a single-outcome node which should be used to record a
+ * failed login or a failed MFA check, which feeds into Kount’s service to help
+ * inform future risk inquiries.
+ * 
  * @author reshma.madan
  *
  */
@@ -65,13 +67,13 @@ public class KountEventsNode extends SingleOutcomeNode {
 		char[] apiKey();
 
 		/**
-		 * Domain.
+		 * Events domain option.
 		 *
-		 * @return the string
+		 * @return the events domain option
 		 */
-		default @Attribute(order = 200, validators = { RequiredValueValidator.class,
-				URLValidator.class }) String domain() {
-			return Constants.KOUNT_EVENT_DOMAIN;
+		default @Attribute(order = 200, validators = {
+				RequiredValueValidator.class }) EventsDomainOption eventsDomainOption() {
+			return EventsDomainOption.SANDBOX;
 		}
 
 		/**
@@ -115,17 +117,41 @@ public class KountEventsNode extends SingleOutcomeNode {
 		}
 	}
 
+	/**
+	 * The Enum AuthenticationOutcome.
+	 */
 	public enum AuthenticationOutcome {
 		Success, Failed;
 	}
 
+	/**
+	 * The Enum AuthenticationType.
+	 */
 	public enum AuthenticationType {
 		Login, Challenge;
 	}
 
+	/**
+	 * The Enum ChallengeType.
+	 */
 	public enum ChallengeType {
 		NA, Captcha2, Puzzle, SecretQuestion, EmailLink, EmailPIN, TextPIN, TextLink, MFAAppGoogle, MFAAppDuo,
 		MFAAppiOS, MFAAppAuthy, MFAAppMicrosoft, MFAAppLastPass, MFAAppOther
+	}
+
+	/**
+	 * The Enum EventsDomainOption.
+	 */
+	public enum EventsDomainOption {
+
+		PRODUCTION(Constants.KOUNT_PRODUCTION_SERVER + Constants.KOUNT_EVENTS_API_ENDPOINT),
+		SANDBOX(Constants.KOUNT_SANDBOX_SERVER + Constants.KOUNT_EVENTS_API_ENDPOINT);
+
+		String domainOption;
+
+		EventsDomainOption(String domainOption) {
+			this.domainOption = domainOption;
+		}
 	}
 
 	/**
@@ -209,7 +235,8 @@ public class KountEventsNode extends SingleOutcomeNode {
 		HttpURLConnection connection = null;
 		try {
 			String payload = getLoginFailedRequestPayload(context);
-			connection = httpConnection.post(config.domain(), payload, String.valueOf(config.apiKey()));
+			connection = httpConnection.post(config.eventsDomainOption().domainOption, payload,
+					String.valueOf(config.apiKey()));
 		} catch (Exception e) {
 			logger.error(
 					"KountEventsNode.postEventsLoginFailedAPI(), Unable to post Event API, Message:" + e.getMessage());
@@ -246,7 +273,8 @@ public class KountEventsNode extends SingleOutcomeNode {
 
 		try {
 			String payload = getChallengeFailedRequestPayload(context, sentTimestamp, completedTimestamp);
-			connection = httpConnection.post(config.domain(), payload, String.valueOf(config.apiKey()));
+			connection = httpConnection.post(config.eventsDomainOption().domainOption, payload,
+					String.valueOf(config.apiKey()));
 
 		} catch (Exception e) {
 			logger.error("KountEventsNode.postEventsChallengeFailedAPI(), Unable to post Event API, Message:"

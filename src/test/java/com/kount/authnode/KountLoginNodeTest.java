@@ -1,3 +1,4 @@
+
 package com.kount.authnode;
 
 import static java.util.Collections.emptyList;
@@ -25,20 +26,25 @@ import com.sun.identity.idm.AMIdentity;
 /**
  * The Class KountLoginNodeTest.
  */
+
 class KountLoginNodeTest {
 
 	/** The node. */
+
 	KountLoginNode node;
 
 	/** The config. */
+
 	@Mock
 	private KountLoginNode.Config config;
 
 	/** The identity. */
+
 	@Mock
 	private AMIdentity identity;
 
 	/** The kount login node. */
+
 	@Mock
 	private KountLoginNode kountLoginNode;
 
@@ -47,14 +53,13 @@ class KountLoginNodeTest {
 	 *
 	 * @throws Exception the exception
 	 */
+
 	@BeforeMethod
 	public void setup() throws Exception {
 		MockitoAnnotations.initMocks(this);
 		given(identity.isActive()).willReturn(true);
 		given(identity.getAttribute("")).willReturn(null);
 		given(config.uniqueIdentifier()).willReturn("");
-		given(config.domain()).willReturn("");
-		// given(loginAPIPost()).willReturn("");
 	}
 
 	/**
@@ -62,6 +67,7 @@ class KountLoginNodeTest {
 	 *
 	 * @throws NodeProcessException the node process exception
 	 */
+
 	@Test(expectedExceptions = NodeProcessException.class)
 	void kountLoginForUserNameNull() throws NodeProcessException {
 		JsonValue sharedState = json(object(field("username", null)));
@@ -76,6 +82,7 @@ class KountLoginNodeTest {
 	 *
 	 * @throws NodeProcessException the node process exception
 	 */
+
 	@Test(expectedExceptions = NodeProcessException.class)
 	void kountLoginNodeConfigDomainIsEmpty() throws NodeProcessException {
 		JsonValue sharedState = json(object());
@@ -90,6 +97,7 @@ class KountLoginNodeTest {
 	 *
 	 * @throws NodeProcessException the node process exception
 	 */
+
 	@Test(expectedExceptions = NodeProcessException.class)
 	void kountLoginNodeConfigUnique_IdentifierIsEmpty() throws NodeProcessException {
 		JsonValue sharedState = json(object());
@@ -107,6 +115,7 @@ class KountLoginNodeTest {
 	 * @param callbacks      the callbacks
 	 * @return the context
 	 */
+
 	private TreeContext getContext(JsonValue sharedState, JsonValue transientState,
 			List<? extends Callback> callbacks) {
 		return getContext(sharedState, transientState, callbacks, Optional.of("bob"));

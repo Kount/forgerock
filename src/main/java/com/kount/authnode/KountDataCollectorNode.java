@@ -5,7 +5,12 @@ import static org.forgerock.openam.auth.node.api.Action.send;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import javax.inject.Inject;
@@ -62,15 +67,29 @@ public class KountDataCollectorNode extends SingleOutcomeNode {
 		}
 
 		/**
-		 * Domain.
+		 * Ddc domain option.
 		 *
-		 * @return the string
+		 * @return the DDC domain option
 		 */
 		@Attribute(order = 200, validators = { RequiredValueValidator.class })
-		default String domain() {
-			return Constants.KOUNT_PROFILER_DOMAIN;
+		default DDCDomainOption ddcDomainOption() {
+			return DDCDomainOption.SANDBOX;
 		}
 
+	}
+
+	/**
+	 * The Enum DDCDomainOption.
+	 */
+	public enum DDCDomainOption {
+
+		PRODUCTION(Constants.KOUNT_DDC_PRODUCTION_SERVER), SANDBOX(Constants.KOUNT_DDC_SANDBOX_SERVER);
+
+		String domainOption;
+
+		DDCDomainOption(String domainOption) {
+			this.domainOption = domainOption;
+		}
 	}
 
 	/**
@@ -95,13 +114,27 @@ public class KountDataCollectorNode extends SingleOutcomeNode {
 		logger.info("Kount Data Collector Node started");
 		Optional<String> result = context.getCallback(HiddenValueCallback.class).map(HiddenValueCallback::getValue)
 				.filter(scriptOutput -> !Strings.isNullOrEmpty(scriptOutput));
+		Map<String, List<String>> requestParameters = context.request.parameters;
+
+		// Fetch kount session id from request
+		String requestedKountSessionId = requestParameters.get(Constants.REQUESTED_KOUNT_SESSION_ID) != null
+				? requestParameters.get(Constants.REQUESTED_KOUNT_SESSION_ID).get(0)
+				: null;
+
 		if (result.isPresent()) {
 			JsonValue newSharedState = context.sharedState.copy();
 			newSharedState.put("kountResult", result.get());
 			return goToNext().replaceSharedState(newSharedState).build();
 		} else {
-			// Generating session ID
-			final String sessionID = UUID.randomUUID().toString().replace("-", "");
+
+			String sessionID = "";
+
+			// Generating session ID if not received from request
+			if (requestedKountSessionId == null || requestedKountSessionId.isEmpty()) {
+				sessionID = UUID.randomUUID().toString().replace("-", "");
+			} else {
+				sessionID = requestedKountSessionId;
+			}
 			StringBuilder callback = new StringBuilder();
 			callback.append(dataCollectorJS(sessionID));
 			callback.append("\n");
@@ -135,7 +168,7 @@ public class KountDataCollectorNode extends SingleOutcomeNode {
 		// find and replace
 		dataCollector = dataCollector.replace("sessionId", sessionId);
 		dataCollector = dataCollector.replace("merchantId", config.merchantId());
-		dataCollector = dataCollector.replace("domain", config.domain());
+		dataCollector = dataCollector.replace("domain", config.ddcDomainOption().domainOption);
 
 		return dataCollector;
 	}
