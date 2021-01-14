@@ -15,6 +15,7 @@ import org.forgerock.openam.auth.node.api.Node;
 import org.forgerock.openam.auth.node.api.NodeProcessException;
 import org.forgerock.openam.auth.node.api.SingleOutcomeNode;
 import org.forgerock.openam.auth.node.api.TreeContext;
+import org.forgerock.openam.core.CoreWrapper;
 import org.forgerock.openam.sm.annotations.adapters.Password;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -27,7 +28,6 @@ import com.kount.authnode.HttpConnection.HTTPResponse;
 import com.sun.identity.idm.AMIdentity;
 import com.sun.identity.idm.IdRepoException;
 import com.sun.identity.idm.IdUtils;
-
 
 /**
  * The KountLoginNode makes the call to the Kount Control Login API, which is
@@ -49,6 +49,8 @@ public class KountLoginNode extends SingleOutcomeNode {
 
 	/** The http connection. */
 	private final HttpConnection httpConnection = new HttpConnection();
+
+	private final CoreWrapper coreWrapper;
 
 	/**
 	 * Configuration for the node.
@@ -106,8 +108,9 @@ public class KountLoginNode extends SingleOutcomeNode {
 	 * @param config The config for this instance.
 	 */
 	@Inject
-	public KountLoginNode(@Assisted Config config) {
+	public KountLoginNode(@Assisted Config config, CoreWrapper coreWrapper) {
 		this.config = config;
+		this.coreWrapper = coreWrapper;
 	}
 
 	/**
@@ -122,7 +125,8 @@ public class KountLoginNode extends SingleOutcomeNode {
 		logger.info("Kount Login Node started");
 		String userHandle = context.sharedState.get(USERNAME).asString();
 		if (userHandle != null) {
-			AMIdentity id = IdUtils.getIdentity(userHandle, context.sharedState.get(REALM).asString());
+			AMIdentity id = IdUtils.getIdentity(userHandle, context.sharedState.get(REALM).asString(),
+					coreWrapper.getUserAliasList(context.sharedState.get(REALM).asString()));
 			getKountLoginRequest(context, id);
 		} else {
 			logger.error("ERROR: KountLoginNode.process(), Message: userHandle is null !!!");

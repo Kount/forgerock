@@ -14,6 +14,7 @@ import org.forgerock.openam.auth.node.api.Node;
 import org.forgerock.openam.auth.node.api.NodeProcessException;
 import org.forgerock.openam.auth.node.api.SingleOutcomeNode;
 import org.forgerock.openam.auth.node.api.TreeContext;
+import org.forgerock.openam.sm.annotations.adapters.Password;
 import org.forgerock.openam.sm.validation.URLValidator;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -53,6 +54,15 @@ public class KountTrustedDeviceNode extends SingleOutcomeNode {
 	 * Configuration for the node.
 	 */
 	public interface Config {
+
+		/**
+		 * Api key.
+		 *
+		 * @return the char[]
+		 */
+		@Attribute(order = 100, requiredValue = true)
+		@Password
+		char[] apiKey();
 
 		/**
 		 * Trusted device domain option.
@@ -116,8 +126,9 @@ public class KountTrustedDeviceNode extends SingleOutcomeNode {
 				throw new NodeProcessException("Kount Login Response is null");
 			}
 		} else {
-			logger.error("ERROR: KountTrustedDeviceNode.process(), Message: Unable to get kountLoginResponseBody");
-			throw new NodeProcessException("Kount Login Response is null");
+			// Add Trusted Device in case its utilized individually like at
+			// user-registration
+			addTrustedDevice(context, Constants.TRUSTED_DEVICE_STATE_TRUSTED, Constants.DEVICE_NOT_FOUND);
 		}
 
 		return goToNext().replaceSharedState(context.sharedState).build();
@@ -189,7 +200,7 @@ public class KountTrustedDeviceNode extends SingleOutcomeNode {
 
 			String payload = getRequestPayload(context);
 			connection = httpConnection.post(config.trustedDeviceDomainOption().domainOption, payload,
-					context.sharedState.get("API_KEY").asString());
+					String.valueOf(config.apiKey()));
 		} catch (Exception e) {
 			logger.error(
 					"ERROR: KountTrustedDeviceNode.postTrustedDevice(), Unable to post Trusted Device API, Message:"
@@ -213,7 +224,7 @@ public class KountTrustedDeviceNode extends SingleOutcomeNode {
 		String uri = config.trustedDeviceDomainOption().domainOption.concat(MessageFormat.format(
 				Constants.API_GET_TRUSTED_DEVICE_PATH, deviceId, context.sharedState.get("kountMerchant").asString()));
 
-		connection = httpConnection.get(uri, context.sharedState.get("API_KEY").asString());
+		connection = httpConnection.get(uri, String.valueOf(config.apiKey()));
 
 		return connection;
 	}
