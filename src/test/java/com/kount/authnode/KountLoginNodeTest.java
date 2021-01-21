@@ -13,6 +13,7 @@ import javax.security.auth.callback.Callback;
 
 import org.forgerock.json.JsonValue;
 import org.forgerock.openam.auth.node.api.ExternalRequestContext.Builder;
+import org.forgerock.openam.core.CoreWrapper;
 import org.forgerock.openam.auth.node.api.NodeProcessException;
 import org.forgerock.openam.auth.node.api.TreeContext;
 import org.mockito.Mock;
@@ -25,36 +26,42 @@ import com.sun.identity.idm.AMIdentity;
 /**
  * The Class KountLoginNodeTest.
  */
+
 class KountLoginNodeTest {
 
 	/** The node. */
+
 	KountLoginNode node;
 
 	/** The config. */
+
 	@Mock
 	private KountLoginNode.Config config;
 
 	/** The identity. */
+
 	@Mock
 	private AMIdentity identity;
 
 	/** The kount login node. */
+
 	@Mock
 	private KountLoginNode kountLoginNode;
+	
+	private CoreWrapper coreWrapper;
 
 	/**
 	 * Setup.
 	 *
 	 * @throws Exception the exception
 	 */
+
 	@BeforeMethod
 	public void setup() throws Exception {
 		MockitoAnnotations.initMocks(this);
 		given(identity.isActive()).willReturn(true);
 		given(identity.getAttribute("")).willReturn(null);
 		given(config.uniqueIdentifier()).willReturn("");
-		given(config.domain()).willReturn("");
-		// given(loginAPIPost()).willReturn("");
 	}
 
 	/**
@@ -62,11 +69,12 @@ class KountLoginNodeTest {
 	 *
 	 * @throws NodeProcessException the node process exception
 	 */
+
 	@Test(expectedExceptions = NodeProcessException.class)
 	void kountLoginForUserNameNull() throws NodeProcessException {
 		JsonValue sharedState = json(object(field("username", null)));
 
-		node = new KountLoginNode(config);
+		node = new KountLoginNode(config, coreWrapper);
 		JsonValue transientState = json(object());
 		node.process(getContext(sharedState, transientState, emptyList()));
 	}
@@ -76,10 +84,11 @@ class KountLoginNodeTest {
 	 *
 	 * @throws NodeProcessException the node process exception
 	 */
+
 	@Test(expectedExceptions = NodeProcessException.class)
 	void kountLoginNodeConfigDomainIsEmpty() throws NodeProcessException {
 		JsonValue sharedState = json(object());
-		node = new KountLoginNode(config);
+		node = new KountLoginNode(config, coreWrapper);
 		JsonValue transientState = json(object());
 		TreeContext context = getContext(sharedState, transientState, emptyList());
 		node.getKountLoginRequest(context, identity);
@@ -90,10 +99,11 @@ class KountLoginNodeTest {
 	 *
 	 * @throws NodeProcessException the node process exception
 	 */
+
 	@Test(expectedExceptions = NodeProcessException.class)
 	void kountLoginNodeConfigUnique_IdentifierIsEmpty() throws NodeProcessException {
 		JsonValue sharedState = json(object());
-		node = new KountLoginNode(config);
+		node = new KountLoginNode(config, coreWrapper);
 		JsonValue transientState = json(object());
 		TreeContext context = getContext(sharedState, transientState, emptyList());
 		node.getKountLoginRequest(context, identity);
@@ -107,6 +117,7 @@ class KountLoginNodeTest {
 	 * @param callbacks      the callbacks
 	 * @return the context
 	 */
+
 	private TreeContext getContext(JsonValue sharedState, JsonValue transientState,
 			List<? extends Callback> callbacks) {
 		return getContext(sharedState, transientState, callbacks, Optional.of("bob"));

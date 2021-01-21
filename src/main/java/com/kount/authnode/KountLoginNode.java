@@ -15,8 +15,8 @@ import org.forgerock.openam.auth.node.api.Node;
 import org.forgerock.openam.auth.node.api.NodeProcessException;
 import org.forgerock.openam.auth.node.api.SingleOutcomeNode;
 import org.forgerock.openam.auth.node.api.TreeContext;
+import org.forgerock.openam.core.CoreWrapper;
 import org.forgerock.openam.sm.annotations.adapters.Password;
-import org.forgerock.openam.sm.validation.URLValidator;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -28,11 +28,12 @@ import com.kount.authnode.HttpConnection.HTTPResponse;
 import com.sun.identity.idm.AMIdentity;
 import com.sun.identity.idm.IdRepoException;
 import com.sun.identity.idm.IdUtils;
-import com.sun.identity.sm.RequiredValueValidator;
 
 /**
- *  The KountLoginNode makes the call to the Kount Control Login API, which is the service that will make the risk
- *  decision based on the data Kount has collected. The response will be either Allow, Block or Challenge.
+ * The KountLoginNode makes the call to the Kount Control Login API, which is
+ * the service that will make the risk decision based on the data Kount has
+ * collected. The response will be either Allow, Block or Challenge.
+ * 
  * @author reshma.madan
  *
  */
@@ -49,6 +50,8 @@ public class KountLoginNode extends SingleOutcomeNode {
 	/** The http connection. */
 	private final HttpConnection httpConnection = new HttpConnection();
 
+	private final CoreWrapper coreWrapper;
+
 	/**
 	 * Configuration for the node.
 	 */
@@ -64,13 +67,13 @@ public class KountLoginNode extends SingleOutcomeNode {
 		char[] apiKey();
 
 		/**
-		 * Domain.
+		 * Login domain option.
 		 *
-		 * @return the string
+		 * @return the login domain option
 		 */
-		default @Attribute(order = 200, validators = { RequiredValueValidator.class,
-				URLValidator.class }) String domain() {
-			return Constants.KOUNT_LOGIN_DOMAIN;
+		@Attribute(order = 200, requiredValue = true)
+		default LoginDomainOption loginDomainOption() {
+			return LoginDomainOption.SANDBOX;
 		}
 
 		/**
@@ -84,13 +87,30 @@ public class KountLoginNode extends SingleOutcomeNode {
 	}
 
 	/**
+	 * The Enum LoginDomainOption.
+	 */
+	public enum LoginDomainOption {
+
+		PRODUCTION(Constants.KOUNT_PRODUCTION_SERVER + Constants.KOUNT_LOGIN_API_ENDPOINT),
+
+		SANDBOX(Constants.KOUNT_SANDBOX_SERVER + Constants.KOUNT_LOGIN_API_ENDPOINT);
+
+		String domainOption;
+
+		LoginDomainOption(String domainOption) {
+			this.domainOption = domainOption;
+		}
+	}
+
+	/**
 	 * Guice constructor.
 	 *
 	 * @param config The config for this instance.
 	 */
 	@Inject
-	public KountLoginNode(@Assisted Config config) {
+	public KountLoginNode(@Assisted Config config, CoreWrapper coreWrapper) {
 		this.config = config;
+		this.coreWrapper = coreWrapper;
 	}
 
 	/**
@@ -105,7 +125,8 @@ public class KountLoginNode extends SingleOutcomeNode {
 		logger.info("Kount Login Node started");
 		String userHandle = context.sharedState.get(USERNAME).asString();
 		if (userHandle != null) {
-			AMIdentity id = IdUtils.getIdentity(userHandle, context.sharedState.get(REALM).asString());
+			AMIdentity id = IdUtils.getIdentity(userHandle, context.sharedState.get(REALM).asString(),
+					coreWrapper.getUserAliasList(context.sharedState.get(REALM).asString()));
 			getKountLoginRequest(context, id);
 		} else {
 			logger.error("ERROR: KountLoginNode.process(), Message: userHandle is null !!!");
@@ -171,7 +192,8 @@ public class KountLoginNode extends SingleOutcomeNode {
 			}
 
 			String payload = getRequestPayload(context, userId);
-			connection = httpConnection.post(config.domain(), payload, String.valueOf(config.apiKey()));
+			connection = httpConnection.post(config.loginDomainOption().domainOption, payload,
+					String.valueOf(config.apiKey()));
 
 		} catch (SSOException | IdRepoException | JSONException e) {
 			logger.error("ERROR: KountLoginNode.loginAPIPost(), Unable to post Login API, Message:" + e.getMessage());
@@ -182,10 +204,11 @@ public class KountLoginNode extends SingleOutcomeNode {
 
 	/**
 	 * Helper method to generate request payload.
-	 * 
-	 * @param context
+	 *
+	 * @param context the context
+	 * @param userId  the user id
 	 * @return the payload
-	 * @throws JSONException
+	 * @throws JSONException the JSON exception
 	 */
 	private String getRequestPayload(TreeContext context, String userId) throws JSONException {
 		logger.debug("In KountLoginNode.getRequestPayload()");

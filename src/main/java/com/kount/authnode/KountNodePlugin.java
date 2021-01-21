@@ -13,7 +13,7 @@ import org.forgerock.openam.auth.node.api.Node;
 public class KountNodePlugin extends AbstractNodeAmPlugin {
 
 	/** The current version. */
-	private static String currentVersion = "1.0.0";
+	private static String currentVersion = "2.0.0";
 
 	/**
 	 * Gets the nodes by version.
@@ -22,7 +22,7 @@ public class KountNodePlugin extends AbstractNodeAmPlugin {
 	 */
 	@Override
 	protected Map<String, Iterable<? extends Class<? extends Node>>> getNodesByVersion() {
-		return Collections.singletonMap("1.0.0", Arrays.asList(KountDecisionNode.class, KountEventsNode.class,
+		return Collections.singletonMap("2.0.0", Arrays.asList(KountDecisionNode.class, KountEventsNode.class,
 				KountLoginNode.class, KountDataCollectorNode.class, KountTrustedDeviceNode.class));
 	}
 

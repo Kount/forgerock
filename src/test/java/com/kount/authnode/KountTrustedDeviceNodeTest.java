@@ -43,7 +43,6 @@ class KountTrustedDeviceNodeTest {
 	@BeforeMethod
 	public void setup() throws Exception {
 		MockitoAnnotations.initMocks(this);
-		given(config.domain()).willReturn("");
 	}
 
 	/**
