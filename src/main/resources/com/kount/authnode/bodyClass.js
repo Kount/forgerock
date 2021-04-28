@@ -2,9 +2,12 @@ var body = document.body;
 function t1(){
         var call= localStorage.getItem("kountCall");
         if(!call){
-            window["client"] = new ka.ClientSDK();
-            client.autoLoadEvents()
-            localStorage.setItem("kountCall", "1");
+			try {
+	            window["client"] = new ka.ClientSDK();
+	            client.autoLoadEvents()
+	            localStorage.setItem("kountCall", "1");
+			} catch (error) {
+			}
         }
         
     }
