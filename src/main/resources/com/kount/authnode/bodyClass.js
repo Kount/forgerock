@@ -3,9 +3,9 @@ function t1(){
         var call= localStorage.getItem("kountCall");
         if(!call){
 			try {
-	            window["client"] = new ka.ClientSDK();
-	            client.autoLoadEvents()
-	            localStorage.setItem("kountCall", "1");
+				window["client"] = new ka.ClientSDK();
+				client.autoLoadEvents()
+				localStorage.setItem("kountCall", "1");
 			} catch (error) {
 			}
         }
